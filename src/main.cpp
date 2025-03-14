@@ -23,7 +23,7 @@ motor Right1 = motor(PORT7, ratio6_1, true);
 motor Left2 = motor(PORT5, ratio6_1, true);
 motor Right2 = motor(PORT6, ratio6_1, false);
 motor Left3 = motor(PORT12, ratio6_1, false);
-motor Right3 = motor(PORT9, ratio6_1, true);
+motor Right3 = motor(PORT8, ratio6_1, true);
 
 motor LB = motor(PORT10, ratio6_1, false);
 motor Intake = motor(PORT11, ratio6_1, false);
@@ -338,12 +338,12 @@ else {
     
 
     //Go
-    Left1.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Left2.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Left3.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Right1.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Right2.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Right3.spin(forward, 11 * motorPower, voltageUnits::volt);
+    Left1.spin(forward, 8 * motorPower, voltageUnits::volt);
+    Left2.spin(forward, 8 * motorPower, voltageUnits::volt);
+    Left3.spin(forward, 8 * motorPower, voltageUnits::volt);
+    Right1.spin(forward, 8 * motorPower, voltageUnits::volt);
+    Right2.spin(forward, 8 * motorPower, voltageUnits::volt);
+    Right3.spin(forward, 8 * motorPower, voltageUnits::volt);
 
     
     //Stop controller when near target
@@ -380,18 +380,18 @@ int turnPID(int turnDistance) {
 
   float kP = 0.004;
   float kI = 0.00;
-  float kD = 0.002;
+  float kD = 0.05;
   float error = 0.0;
   float integral = 0.0;
   float derivative = 0.0;
   float prevError = 0.0;
   float motorPower = 0.0;
   float prevMotorPower = 0.0;
-  float startDistance = (RInertial.rotation(degrees) - LInertial.rotation(degrees)) / 2.0;  
+  float startDistance = (RInertial.rotation(degrees) + LInertial.rotation(degrees)) / 2.0;  
 
  while(true) {
   
-    float currentDistance = startDistance - (RInertial.rotation(degrees) - LInertial.rotation(degrees)) / 2.0;
+    float currentDistance = startDistance - (RInertial.rotation(degrees) + LInertial.rotation(degrees)) / 2.0;
    
     //calculate error
     error = turnDistance - currentDistance; 
@@ -416,19 +416,19 @@ int turnPID(int turnDistance) {
     
     
     //Acceleration limiter
-    float accelRate = 0.2f;
+    float accelRate = 0.25f;
     if (motorPower > prevMotorPower + accelRate) motorPower = prevMotorPower + accelRate;
     if (motorPower < prevMotorPower - accelRate) motorPower = prevMotorPower - accelRate;
     
-    Left1.spin(forward, -11 * motorPower, voltageUnits::volt);
-    Left2.spin(forward, -11 * motorPower, voltageUnits::volt);
-    Left3.spin(forward, -11 * motorPower, voltageUnits::volt);
-    Right1.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Right2.spin(forward, 11 * motorPower, voltageUnits::volt);
-    Right3.spin(forward, 11 * motorPower, voltageUnits::volt);
+    Left1.spin(forward, -9 * motorPower, voltageUnits::volt);
+    Left2.spin(forward, -9 * motorPower, voltageUnits::volt);
+    Left3.spin(forward, -9 * motorPower, voltageUnits::volt);
+    Right1.spin(forward, 9 * motorPower, voltageUnits::volt);
+    Right2.spin(forward, 9 * motorPower, voltageUnits::volt);
+    Right3.spin(forward, 9 * motorPower, voltageUnits::volt);
 
     //Exit in certain range
-    if (error < 1 && error > -1) {
+    if (error < 2.5 && error > -2.5) {
     
     break;
     
@@ -452,19 +452,56 @@ Right3.stop();
   return 1;
 }
 
+bool intakeRunning = false;
+
+// Function to run the intake
+int runIntake() {
+  while (intakeRunning) {
+    Intake.spin(reverse, 100, velocityUnits::pct);
+    wait(20, msec);
+  }
+  Intake.stop();
+  return 0;
+}
 
 void autonomous(void) {
 
   RInertial.calibrate();
   LInertial.calibrate();
   wait (2, seconds);
- // drivePID(800);
-  turnPID(90);
+
+  Intake.spinFor(reverse, .6, seconds, 100, velocityUnits::pct);
+  wait(0.2, seconds);
+  drivePID(590);
+  turnPID(88);
+  drivePID(-630);
+  wait(0.5, seconds);
+  turnPID(-100);
+  
+  intakeRunning = true;
+  task intakeTask(runIntake);
+
+  drivePID(1000);
+  turnPID(-45);
+  drivePID(1370);
+  turnPID(-120);
+  drivePID(900);
+  wait(0.5, seconds);
+  drivePID(1400);
+  wait(0.5, seconds);
+  drivePID(-400);
+  turnPID(92);
+  intakeRunning = false;
+  intakeTask.stop();
 
 }
 
 
 void usercontrol(void) {
+
+  LInertial.calibrate();
+  RInertial.calibrate();
+  wait(1,seconds);
 
   while (1) {
 
@@ -472,7 +509,7 @@ void usercontrol(void) {
 
     Brain.Screen.printAt(10, 50, "Left Inertial: %f", LInertial.rotation(degrees));
     Brain.Screen.printAt(10, 70, "Right Inertial: %f", RInertial.rotation(degrees));
-    Brain.Screen.printAt(10, 90, "Inertial Heading: %f", (RInertial.rotation(degrees) - LInertial.rotation(degrees)) / 2.0);
+    Brain.Screen.printAt(10, 90, "Inertial Heading: %f", (RInertial.rotation(degrees) + LInertial.rotation(degrees)) / 2.0);
     Brain.Screen.printAt(10, 110, "Heading: %f", heading);
     Brain.Screen.printAt(10, 130, "X: %f", xpos);
     Brain.Screen.printAt(10, 150, "Y: %f", ypos);
@@ -497,9 +534,6 @@ void usercontrol(void) {
      Left2.stop(hold);
      Left3.stop(hold);
      }
-  
-  
-     
 
   if(Controller1.ButtonR1.pressing()){
         Intake.spin(forward, 11000, voltageUnits::mV);
@@ -507,7 +541,7 @@ void usercontrol(void) {
         Intake.spin(reverse, 11000, voltageUnits::mV);
    }
    else{ 
-    Intake.spin(forward, 11000 * (Controller1.ButtonL1.pressing() - Controller1.ButtonL2.pressing()), voltageUnits::mV);
+    Intake.stop(hold);
     }
 
     
